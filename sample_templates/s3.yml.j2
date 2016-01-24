@@ -12,7 +12,7 @@ Metrics:
     BucketName: "{{ instance.name }}"
     StorageType: ReducedRedundancyStorage
   Options:
-    Period: 1
+    Period: 1440
     Formatter: 'cloudwatch.%(Namespace)s.{{ instance.name|replace(".", "_") }}.%(dimension)s.%(statistic)s.%(Unit)s'
 - Namespace: "AWS/S3"
   MetricName: "BucketSizeBytes"
@@ -22,7 +22,7 @@ Metrics:
     BucketName: "{{ instance.name }}"
     StorageType: StandardStorage
   Options:
-    Period: 1
+    Period: 1440
     Formatter: 'cloudwatch.%(Namespace)s.{{ instance.name|replace(".", "_") }}.%(dimension)s.%(statistic)s.%(Unit)s'
 
 {% endfor %}
