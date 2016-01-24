@@ -41,6 +41,7 @@ import boto.elasticache
 import boto.ec2.autoscale
 import boto.kinesis
 import boto.sqs
+import boto.s3
 import jinja2
 import os.path
 
@@ -176,6 +177,12 @@ def list_dynamodb(region, filter_by_kwargs):
     return lookup(tables, filter_by=filter_by_kwargs)
 
 
+def list_s3(region, filter_by_kwargs):
+    """List all S3 buckets."""
+    conn = boto.s3.connect_to_region(region)
+    return lookup(conn.get_all_buckets(), filter_by=filter_by_kwargs)
+
+
 list_resources = {
     'ec2': list_ec2,
     'elb': list_elb,
@@ -183,6 +190,7 @@ list_resources = {
     'elasticache': list_elasticache,
     'asg': list_autoscaling_group,
     'sqs': list_sqs,
+    's3': list_s3,
     'kinesisapp': list_kinesis_applications,
     'dynamodb': list_dynamodb
 }
