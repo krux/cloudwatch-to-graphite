@@ -39,8 +39,9 @@ DEFAULT_REGION = 'us-east-1'
 DEFAULT_OPTIONS = {
     'Period': 1,  # 1 minute
     'Count': 5,  # 5 periods
-    'Formatter': ('cloudwatch.%(Namespace)s.%(dimension)s.%(MetricName)s'
-        '.%(statistic)s.%(Unit)s')
+    'Formatter': (
+        'cloudwatch.%(Namespace)s.%(dimension)s.%(MetricName)s.%(statistic)s.%(Unit)s'
+    )
 }
 
 

@@ -87,6 +87,13 @@ variables are derived:
 
 The format string is Python's `%-style <https://docs.python.org/2/library/stdtypes.html#string-formatting>`_.
 
+S3 Notes
+~~~~~~~~
+
+S3 usage stats are updated only daily and not available until after 00:00 UTC. As a result,
+you need to set the ``Period`` to 1440 (1 day).
+
+
 config.yaml
 -----------
 
