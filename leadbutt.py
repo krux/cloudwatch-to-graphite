@@ -43,8 +43,7 @@ DEFAULT_REGION = 'us-east-1'
 DEFAULT_OPTIONS = {
     'Period': 1,  # 1 minute
     'Count': 5,  # 5 periods
-    'Formatter': ('cloudwatch.%(Namespace)s.%(dimension)s.%(MetricName)s'
-        '.%(statistic)s.%(Unit)s')
+    'Formatter': 'cloudwatch.%(Namespace)s.%(dimension)s.%(MetricName)s.%(statistic)s.%(Unit)s'
 }
 
 
@@ -60,8 +59,7 @@ def get_config(config_file):
     if config_file == '-':
         return load(sys.stdin)
     if not os.path.exists(config_file):
-        sys.stderr.write('ERROR: Must either run next to config.yaml or'
-            ' specify a config file.\n' + __doc__)
+        sys.stderr.write('ERROR: Must either run next to config.yaml or specify a config file.\n' + __doc__)
         sys.exit(2)
     with open(config_file) as fp:
         return load(fp)
@@ -180,7 +178,7 @@ def leadbutt(config_file, cli_options, verbose=False, **kwargs):
             time.sleep(kwargs.get('interval', 0) / 1000.0)
 
 
-def main(*args, **kwargs):
+def main():
     options = docopt(__doc__, version=__version__)
     # help: http://boto.readthedocs.org/en/latest/ref/cloudwatch.html#boto.ec2.cloudwatch.CloudWatchConnection.get_metric_statistics
     config_file = options.pop('--config-file')

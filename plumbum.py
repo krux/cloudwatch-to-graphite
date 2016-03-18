@@ -44,8 +44,8 @@ import boto.kinesis
 import boto.sqs
 import jinja2
 import os.path
+from cw2g import __version__
 
-__version__ = '0.9.2'
 
 # DEFAULT_NAMESPACE = 'ec2'  # TODO
 DEFAULT_REGION = 'us-east-1'
@@ -169,7 +169,7 @@ def list_sqs(region, filter_by_kwargs):
     return lookup(queues, filter_by=filter_by_kwargs)
 
 
-def list_kinesis_applications(region, filter_by_kwargs):
+def list_kinesis_applications(region):
     """List all the kinesis applications along with the shards for each stream"""
     conn = boto.kinesis.connect_to_region(region)
     streams = conn.list_streams()['StreamNames']
