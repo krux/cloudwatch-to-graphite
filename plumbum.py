@@ -44,7 +44,7 @@ import boto.kinesis
 import boto.sqs
 import jinja2
 import os.path
-from cw2g import __version__
+from leadbutt import __version__
 
 
 # DEFAULT_NAMESPACE = 'ec2'  # TODO
@@ -58,6 +58,7 @@ class CliArgsException(Exception):
 def get_property_func(key):
     """
     Get the accessor function for an instance to look for `key`.
+    :param key
 
     Look for it as an attribute, and if that does not work, look to see if it
     is a tag.
@@ -104,7 +105,11 @@ def interpret_options(args=sys.argv[1:]):
 
 
 def list_billing(region, filter_by_kwargs):
-    """List available billing metrics"""
+    """
+    List available billing metrics
+    :param region: AWS region
+    :param filter_by_kwargs: args to pass to filter()
+    """
     conn = boto.ec2.cloudwatch.connect_to_region(region)
     metrics = conn.list_metrics(metric_name='EstimatedCharges')
     # Filtering is based on metric Dimensions.  Only really valuable one is

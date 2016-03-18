@@ -48,10 +48,12 @@ DEFAULT_OPTIONS = {
 
 
 def get_config(config_file):
-    """Get configuration from a file."""
-    def load(fp):
+    """
+    :param config_file - file to read to get/generate the configuration.
+    """
+    def load(file_path):
         try:
-            return yaml.load(fp)
+            return yaml.load(file_path)
         except yaml.YAMLError as e:
             sys.stderr.write(text_type(e))
             sys.exit(1)  # TODO document exit codes
@@ -70,9 +72,9 @@ def get_options(config_options, local_options, cli_options):
     Figure out what options to use based on the four places it can come from.
 
     Order of precedence:
-    * cli_options      specified by the user at the command line
-    * local_options    specified in the config file for the metric
-    * config_options   specified in the config file at the base
+    :param cli_options      specified by the user at the command line
+    :param local_options    specified in the config file for the metric
+    :param config_options   specified in the config file at the base
     * DEFAULT_OPTIONS  hard coded defaults
     """
     options = DEFAULT_OPTIONS.copy()
@@ -88,6 +90,10 @@ def get_options(config_options, local_options, cli_options):
 def output_results(results, metric, options):
     """
     Output the results to stdout.
+    :param results metric results as returned from the AWS CloudWatch API
+    :param metric  the config relevant to this metric
+    :param options from the options section of the config file
+
 
     TODO: add AMPQ support for efficiency
     """
@@ -121,17 +127,17 @@ def leadbutt(config_file, cli_options, verbose=False, **kwargs):
     # we'll re-use the interval to sleep at the bottom of the loop that calls get_metric_statistics.
     @retry(wait_exponential_multiplier=kwargs.get('interval', None),
            wait_exponential_max=kwargs.get('max_interval', None),
-           # give up at the point the next cron of this script probably runs; Period is minutes; some_max_delay needs ms
+           # give up at the point kwargs next cron of this script probably runs; Period is minutes; some_max_delay needs ms
            stop_max_delay=cli_options['Count'] * cli_options['Period'] * 60 * 1000)
-    def get_metric_statistics(**kwargs):
+    def get_metric_statistics(**stats_args):
         """
         A thin wrapper around boto.cloudwatch.connection.get_metric_statistics, for the
         purpose of adding the @retry decorator
-        :param kwargs:
+        :param stats_args:
         :return:
         """
-        connection = kwargs.pop('connection')
-        return connection.get_metric_statistics(**kwargs)
+        connection = stats_args.pop('connection')
+        return connection.get_metric_statistics(**stats_args)
 
     config = get_config(config_file)
     config_options = config.get('Options')
