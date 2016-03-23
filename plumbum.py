@@ -30,6 +30,7 @@ They're written in jinja2, and have these variables available:
 from __future__ import unicode_literals
 
 import argparse
+import os.path
 import sys
 
 import boto
@@ -43,7 +44,6 @@ import boto.ec2.autoscale
 import boto.kinesis
 import boto.sqs
 import jinja2
-import os.path
 
 __version__ = '0.9.2'
 
