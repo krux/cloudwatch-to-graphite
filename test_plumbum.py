@@ -16,14 +16,14 @@ class GetCLIOptionsTests(unittest.TestCase):  # flake8: noqa
 
     def test_all_args(self):
         args = [
-            '-r', 'non-legal-region',
+            '-r', 'us-west-2',
             '-f', 'instance-type=c3.large',
             'foo.yaml.j2',
             'ec2',
         ]
         templ, ns, region, filter_by, token = plumbum.interpret_options(args)
 
-        self.assertEqual(region, 'non-legal-region')
+        self.assertEqual(region, 'us-west-2')
         self.assertEqual(ns, 'ec2')
         self.assertEqual(templ, 'foo.yaml.j2')
         self.assertEqual(filter_by, {u'instance-type': u'c3.large'})
@@ -77,7 +77,7 @@ class FilterTests(unittest.TestCase):
     def test_filter_miss(self):
         filter_args = {'root_device_type': 'instance-store'}
         filtered_instances = plumbum.lookup(self.instances, filter_by=filter_args)
-        self.assertEquals(0, len(filtered_instances))
+        self.assertEqual(0, len(filtered_instances))
 
 
 class ListXXXTests(unittest.TestCase):

@@ -87,7 +87,9 @@ def interpret_options(args=sys.argv[1:]):
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--version', action='version', version=__version__)
-    parser.add_argument("-r", "--region", help="AWS region", default=DEFAULT_REGION)
+    parser.add_argument("-r", "--region", help="AWS region",
+                        choices=[r.name for r in boto.ec2.regions()],
+                        default=DEFAULT_REGION)
     parser.add_argument("-f", "--filter", action='append', default=[],
                         help="filter to apply to AWS objects in key=value form, can be used multiple times")
     parser.add_argument('--token', action='append', help='a key=value pair to use when populating templates')
@@ -231,10 +233,6 @@ def main():
     loader = jinja2.FileSystemLoader(fs_path)
     jinja2_env = jinja2.Environment(loader=loader)
     template = jinja2_env.get_template(os.path.basename(template))
-
-    # insure a valid region is set
-    if region not in [r.name for r in boto.ec2.regions()]:
-        raise ValueError("Invalid region:{0}".format(region))
 
     # should I be using ARNs?
     try:
