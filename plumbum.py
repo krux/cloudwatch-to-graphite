@@ -112,6 +112,14 @@ def interpret_options(args=sys.argv[1:]):
     return args.template, namespace, args.region, filters, args.token
 
 
+def get_jinja_template(template_file):
+    """Given a file path, return a jinja2 object on which to call .render()"""
+    fs_path = os.path.abspath(os.path.dirname(template_file))
+    loader = jinja2.FileSystemLoader(fs_path)
+    jinja2_env = jinja2.Environment(loader=loader)
+    return jinja2_env.get_template(os.path.basename(template_file))
+
+
 def list_billing(region, filter_by_kwargs):
     """List available billing metrics"""
     conn = boto.ec2.cloudwatch.connect_to_region(region)
@@ -214,13 +222,10 @@ list_resources = {
 
 def main():
 
-    template, namespace, region, filters, tokens = interpret_options()
+    template_file, namespace, region, filters, tokens = interpret_options()
 
     # get the template first so this can fail before making a network request
-    fs_path = os.path.abspath(os.path.dirname(template))
-    loader = jinja2.FileSystemLoader(fs_path)
-    jinja2_env = jinja2.Environment(loader=loader)
-    template = jinja2_env.get_template(os.path.basename(template))
+    jinja_template = get_jinja_template(template_file)
 
     # should I be using ARNs?
     try:
@@ -244,7 +249,7 @@ def main():
             (key, value) = token_pair.split('=')
             template_tokens[key] = value
 
-    print(template.render(template_tokens))
+    print(jinja_template.render(template_tokens))
 
 
 if __name__ == '__main__':
