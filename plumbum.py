@@ -36,6 +36,7 @@ import boto
 import boto.dynamodb
 import boto.ec2
 import boto.ec2.elb
+import boto.ec2.cloudwatch
 import boto.rds
 import boto.elasticache
 import boto.ec2.autoscale
@@ -87,16 +88,45 @@ def interpret_options(args=sys.argv[1:]):
     parser = argparse.ArgumentParser()
     parser.add_argument('--version', action='version', version=__version__)
     parser.add_argument("-r", "--region", help="AWS region", default=DEFAULT_REGION)
-    parser.add_argument("-f", "--filter", help="filter to apply to AWS objects")
+    parser.add_argument("-f", "--filter", action='append', default=[],
+                        help="filter to apply to AWS objects in key=value form, can be used multiple times")
     parser.add_argument('--token', action='append', help='a key=value pair to use when populating templates')
-    parser.add_argument("namespace", type=str, help="AWS namespace")
     parser.add_argument("template", type=str, help="the template to interpret")
+    parser.add_argument("namespace", type=str, help="AWS namespace")
 
     args = parser.parse_args(args=args)
 
+    # filters are passed in as list of key=values pairs, we need a dictionary to pass to lookup()
+    filters = dict()
+    for filter in args.filter:
+        (key, value) = filter.split('=')
+        filters[key] = value
+
     # Support 'ec2' (human friendly) and 'AWS/EC2' (how CloudWatch natively calls these things)
-    namespace = args.namespace.rsplit('/', 2)[-1].lower()
-    return args.template, namespace, args.region, args.filter, args.token
+    if args.namespace is not None:  # Just making test pass, argparse will catch this missing.
+        namespace = args.namespace.rsplit('/', 2)[-1].lower()
+    else:
+        namespace = None
+    return args.template, namespace, args.region, filters, args.token
+
+
+def list_billing(region, filter_by_kwargs):
+    """List available billing metrics"""
+    conn = boto.ec2.cloudwatch.connect_to_region(region)
+    metrics = conn.list_metrics(metric_name='EstimatedCharges')
+    # Filtering is based on metric Dimensions.  Only really valuable one is
+    # ServiceName.
+    if filter_by_kwargs:
+        filter_key = filter_by_kwargs.keys()[0]
+        filter_value = filter_by_kwargs.values()[0]
+        if filter_value:
+            filtered_metrics = [x for x in metrics if x.dimensions.get(filter_key) and x.dimensions.get(filter_key)[0] == filter_value]
+        else:
+            # ServiceName=''
+            filtered_metrics = [x for x in metrics if not x.dimensions.get(filter_key)]
+    else:
+        filtered_metrics = metrics
+    return filtered_metrics
 
 
 def list_ec2(region, filter_by_kwargs):
@@ -187,7 +217,8 @@ list_resources = {
     'asg': list_autoscaling_group,
     'sqs': list_sqs,
     'kinesisapp': list_kinesis_applications,
-    'dynamodb': list_dynamodb
+    'dynamodb': list_dynamodb,
+    'billing': list_billing
 }
 
 

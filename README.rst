@@ -48,15 +48,25 @@ the config file to '-'::
 
 There's a helper to generate configuration files called ``plumbum``.  Use it like::
 
-    plumbum [-r REGION] [-f FILTER] [--token TOKEN] namespace template
+    plumbum [-r REGION] [-f FILTER] [--token TOKEN] template namespace
 
 Namespace is the CloudWatch namespace for the resources of interest; for example ``AWS/RDS``.
 The template is a Jinja2 template. You can add arbitrary replacement tokens, eg ``{{ replace_me }}``, and then
 pass in values on the CLI via ``--token``. For example, if you called::
 
-    plumbum --token replace_me='hello, world' AWS/RDS sample_templates/rds.yml.j2
+    plumbum --token replace_me='hello, world' sample_templates/rds.yml.j2 AWS/RDS
 
 You would get all instances of ``{{ replace_me }}`` in the templace replaced with ``hello, world``.
+
+Filters
+~~~~~~~
+
+You can pass simple ``key=value`` filters in to ``plumbum``; be aware of the limitations:
+
+* the filters run against whatever the AWS API has returned; if you have a lot of objects of whatever type, expect the API request to take a while.
+* they work only against object attributes and tags returned by the API. For example, RDS and ELB objects can be tagged, but as getting the tags is a per-object subrequest; ``plumbum`` does not do those, so you can only filter on the object attributes.
+
+Example: ``plumbum -f Name=my-dev-instance sample_templates/ec2.yml.j2 ec2``
 
 
 Sending Data to Graphite
