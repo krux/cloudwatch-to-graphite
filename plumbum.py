@@ -120,6 +120,20 @@ def get_jinja_template(template_file):
     return jinja2_env.get_template(os.path.basename(template_file))
 
 
+def get_template_tokens(base_tokens={}, cli_tokens=[]):
+    """add the cli tokens to the base tokens, checking for name collision"""
+    if cli_tokens is not None:
+        for token_pair in cli_tokens:
+            if token_pair.count('=') != 1:
+                raise CliArgsException("token pair '{}' invalid, must contain exactly one '=' character.".format(token_pair))
+            (key, value) = token_pair.split('=')
+            if key in base_tokens:
+                raise CliArgsException("CLI token {} collides with a base token!".format(key))
+            else:
+                base_tokens[key] = value
+    return base_tokens
+
+
 def list_billing(region, filter_by_kwargs):
     """List available billing metrics"""
     conn = boto.ec2.cloudwatch.connect_to_region(region)
@@ -222,7 +236,7 @@ list_resources = {
 
 def main():
 
-    template_file, namespace, region, filters, tokens = interpret_options()
+    template_file, namespace, region, filters, cli_tokens = interpret_options()
 
     # get the template first so this can fail before making a network request
     jinja_template = get_jinja_template(template_file)
@@ -235,21 +249,17 @@ def main():
               .format(namespace))
         sys.exit(1)
 
-    # base tokens
-    template_tokens = {
+    base_tokens = {
         'filters': filters,
         'region': region,  # Use for Auth config section if needed
         'resources': resources,
     }
-    # add tokens passed as cli args:
-    if tokens is not None:
-        for token_pair in tokens:
-            if token_pair.count('=') != 1:
-                raise CliArgsException("token pair '{0}' invalid, must contain exactly one '=' character.".format(token_pair))
-            (key, value) = token_pair.split('=')
-            template_tokens[key] = value
 
-    print(jinja_template.render(template_tokens))
+    print(
+        jinja_template.render(
+            get_template_tokens(base_tokens=base_tokens, cli_tokens=cli_tokens)
+        )
+    )
 
 
 if __name__ == '__main__':
