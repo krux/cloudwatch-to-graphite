@@ -153,9 +153,14 @@ def leadbutt(config_file, cli_options, verbose=False, **kwargs):
             config_options, metric.get('Options'), cli_options)
         period_local = options['Period'] * 60
         count_local = options['Count']
-        end_time = datetime.datetime.utcnow()
+        # if you have metrics that are available only every 5 minutes, be sure to request only stats
+        # that are likely/sure to be up to date, ie ones ending on the previous period increment.
+        end_time = datetime.datetime.utcnow() - datetime.timedelta(
+            seconds=int(time.time()) % period_local
+        )
         start_time = end_time - datetime.timedelta(
-            seconds=period_local * count_local)
+            seconds=period_local * count_local
+        )
         # if 'Unit 'is in the config, request only that; else get all units
         unit = metric.get('Unit')
         metric_names = metric['MetricName']
