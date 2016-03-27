@@ -115,6 +115,33 @@ def output_results(results, metric, options):
             sys.stdout.write(line)
 
 
+def value_pad_results(results, start_time, end_time, interval, value=0):
+    """
+    Pad CloudWatch results with a default value.
+
+    For a set of CloudWatch API results, check if there is a result at each timestamp results are expected;
+    where absent, set it to the 'value' parameter. Return the padded set of results. Start and end times
+    need to have the microseconds shaved to match what the CloudWatch API returns.
+    :param results: the result set returned byt
+    :param start_time: as passed to get_metric_statistics
+    :param end_time: get_metric_statistics
+    :param interval: the interval *in minutes* at which results are expected
+    :param value: the value to put in the results
+    :return:
+    """
+    this_time = start_time - datetime.timedelta(microseconds=start_time.microsecond)
+    end_time = end_time - datetime.timedelta(microseconds=end_time.microsecond)
+    while this_time < end_time:
+        if not filter(lambda x: x['Timestamp'] == this_time, results):
+            results.append({
+                'Timestamp': this_time,
+                'Sum': value,
+                'Unit': 'Count',
+            })
+        this_time += datetime.timedelta(seconds=interval * 60)
+    return results
+
+
 def leadbutt(config_file, cli_options, verbose=False, **kwargs):
 
     # This function is defined in here so that the decorator can take CLI options, passed in from main()
@@ -179,6 +206,15 @@ def leadbutt(config_file, cli_options, verbose=False, **kwargs):
                 dimensions=metric['Dimensions'],
                 unit=unit
             )
+
+            if 'NullIsZero' in options and metric_name in options['NullIsZero']:
+                results = value_pad_results(
+                    results,
+                    start_time,
+                    end_time,
+                    options['NullIsZero'][metric_name],
+                )
+
             output_results(results, this_metric, options)
             time.sleep(kwargs.get('interval', 0) / 1000.0)
 
