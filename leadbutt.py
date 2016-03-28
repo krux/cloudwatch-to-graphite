@@ -122,9 +122,9 @@ def value_pad_results(results, start_time, end_time, interval, value=0):
     For a set of CloudWatch API results, check if there is a result at each timestamp results are expected;
     where absent, set it to the 'value' parameter. Return the padded set of results. Start and end times
     need to have the microseconds shaved to match what the CloudWatch API returns.
-    :param results: the result set returned byt
+    :param results: the result set returned by get_metric_statistics
     :param start_time: as passed to get_metric_statistics
-    :param end_time: get_metric_statistics
+    :param end_time: as passed to get_metric_statistics
     :param interval: the interval *in minutes* at which results are expected
     :param value: the value to put in the results
     :return:
