@@ -13,6 +13,7 @@ setup(
         'console_scripts': [
             'leadbutt = leadbutt:main',
             'plumbum = plumbum:main',
+            'plumblead = plumblead:main',
         ],
     },
     install_requires=[
