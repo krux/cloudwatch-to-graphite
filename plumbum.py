@@ -30,6 +30,7 @@ They're written in jinja2, and have these variables available:
 from __future__ import unicode_literals
 
 import argparse
+import os.path
 import sys
 
 import boto
@@ -43,7 +44,6 @@ import boto.ec2.autoscale
 import boto.kinesis
 import boto.sqs
 import jinja2
-import os.path
 
 from leadbutt import __version__
 
@@ -87,7 +87,9 @@ def interpret_options(args=sys.argv[1:]):
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--version', action='version', version=__version__)
-    parser.add_argument("-r", "--region", help="AWS region", default=DEFAULT_REGION)
+    parser.add_argument("-r", "--region", help="AWS region",
+                        choices=[r.name for r in boto.ec2.regions()],
+                        default=DEFAULT_REGION)
     parser.add_argument("-f", "--filter", action='append', default=[],
                         help="filter to apply to AWS objects in key=value form, can be used multiple times")
     parser.add_argument('--token', action='append', help='a key=value pair to use when populating templates')
@@ -105,6 +107,28 @@ def interpret_options(args=sys.argv[1:]):
     else:
         namespace = None
     return args.template, namespace, args.region, filters, args.token
+
+
+def get_jinja_template(template_file):
+    """Given a file path, return a jinja2 object on which to call .render()"""
+    fs_path = os.path.abspath(os.path.dirname(template_file))
+    loader = jinja2.FileSystemLoader(fs_path)
+    jinja2_env = jinja2.Environment(loader=loader)
+    return jinja2_env.get_template(os.path.basename(template_file))
+
+
+def get_template_tokens(base_tokens={}, cli_tokens=[]):
+    """add the cli tokens to the base tokens, checking for name collision"""
+    if cli_tokens is not None:
+        for token_pair in cli_tokens:
+            if token_pair.count('=') != 1:
+                raise CliArgsException("token pair '{}' invalid, must contain exactly one '=' character.".format(token_pair))
+            (key, value) = token_pair.split('=')
+            if key in base_tokens:
+                raise CliArgsException("CLI token {} collides with a base token!".format(key))
+            else:
+                base_tokens[key] = value
+    return base_tokens
 
 
 def list_billing(region, filter_by_kwargs):
@@ -209,17 +233,10 @@ list_resources = {
 
 def main():
 
-    template, namespace, region, filters, tokens = interpret_options()
+    template_file, namespace, region, filters, cli_tokens = interpret_options()
 
     # get the template first so this can fail before making a network request
-    fs_path = os.path.abspath(os.path.dirname(template))
-    loader = jinja2.FileSystemLoader(fs_path)
-    jinja2_env = jinja2.Environment(loader=loader)
-    template = jinja2_env.get_template(os.path.basename(template))
-
-    # insure a valid region is set
-    if region not in [r.name for r in boto.ec2.regions()]:
-        raise ValueError("Invalid region:{0}".format(region))
+    jinja_template = get_jinja_template(template_file)
 
     # should I be using ARNs?
     try:
@@ -229,21 +246,17 @@ def main():
               .format(namespace))
         sys.exit(1)
 
-    # base tokens
-    template_tokens = {
+    base_tokens = {
         'filters': filters,
         'region': region,  # Use for Auth config section if needed
         'resources': resources,
     }
-    # add tokens passed as cli args:
-    if tokens is not None:
-        for token_pair in tokens:
-            if token_pair.count('=') != 1:
-                raise CliArgsException("token pair '{0}' invalid, must contain exactly one '=' character.".format(token_pair))
-            (key, value) = token_pair.split('=')
-            template_tokens[key] = value
 
-    print(template.render(template_tokens))
+    print(
+        jinja_template.render(
+            get_template_tokens(base_tokens=base_tokens, cli_tokens=cli_tokens)
+        )
+    )
 
 
 if __name__ == '__main__':

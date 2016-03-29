@@ -1,0 +1,64 @@
+# Elastic Beanstalk Sample
+#
+Auth:
+  region: "{{ region }}"
+
+Metrics:
+{% for asg in resources.AutoScalingGroups %}
+- Namespace: "AWS/EC2"
+  MetricName:
+   - CPUUtilization
+  Statistics:
+  - "Average"
+  Dimensions:
+    AutoScalingGroupName: {{ asg.Name }}
+  Options:
+    Formatter: 'cloudwatch.{{ account_alias }}.{{ region }}.ec2.asg.{{ environment_name }}.%(MetricName)s.%(statistic)s.%(Unit)s'
+- Namespace: "AWS/EC2"
+  MetricName:
+    - DiskReadBytes
+    - DiskReadOps
+    - DiskWriteBytes
+    - DiskWriteOps
+    - NetworkIn
+    - NetworkOut
+    - NetworkPacketsIn
+    - NetworkPacketsOut
+    - StatusCheckFailed
+    - StatusCheckFailed_Instance
+    - StatusCheckFailed_System
+  Statistics:
+  - "Sum"
+  Dimensions:
+    AutoScalingGroupName: {{ asg.Name }}
+  Options:
+    Formatter: 'cloudwatch.ec2.asg.{{ environment_name }}.%(MetricName)s.%(statistic)s.%(Unit)s'
+{% endfor %}
+{% for elb in resources.LoadBalancers%}
+- Namespace: "AWS/ELB"
+  MetricName:
+    - BackendConnectionErrors
+    - RequestCount
+    - HTTPCode_ELB_5XX
+    - HTTPCode_Backend_5XX
+    - HTTPCode_Backend_4XX
+    - HTTPCode_Backend_3XX
+    - HTTPCode_Backend_2XX
+  Statistics: "Sum"
+  Dimensions:
+    LoadBalancerName: "{{ elb.Name }}"
+  Options:
+    Formatter: 'cloudwatch.ec2.asg.{{ environment_name }}.%(MetricName)s.%(statistic)s.%(Unit)s'
+- Namespace: "AWS/ELB"
+  MetricName:
+    - HealthyHostCount
+    - UnHealthyHostCount
+    - SurgeQueueLength
+    - SpilloverCount
+  Statistics:
+    Maximum
+  Dimensions:
+    LoadBalancerName: "{{ elb.Name }}"
+  Options:
+    Formatter: 'cloudwatch.ec2.elb.{{ environment_name }}.%(MetricName)s.%(statistic)s.%(Unit)s'
+{% endfor %}

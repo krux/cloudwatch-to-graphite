@@ -33,7 +33,7 @@ if sys.version_info[0] >= 3:
 else:
     text_type = unicode
 
-__version__ = '0.9.5'
+__version__ = '0.9.5b1'
 
 
 # configuration
@@ -43,8 +43,7 @@ DEFAULT_REGION = 'us-east-1'
 DEFAULT_OPTIONS = {
     'Period': 1,  # 1 minute
     'Count': 5,  # 5 periods
-    'Formatter': ('cloudwatch.%(Namespace)s.%(dimension)s.%(MetricName)s'
-        '.%(statistic)s.%(Unit)s')
+    'Formatter': 'cloudwatch.%(Namespace)s.%(dimension)s.%(MetricName)s.%(statistic)s.%(Unit)s'
 }
 
 
@@ -60,8 +59,7 @@ def get_config(config_file):
     if config_file == '-':
         return load(sys.stdin)
     if not os.path.exists(config_file):
-        sys.stderr.write('ERROR: Must either run next to config.yaml or'
-            ' specify a config file.\n' + __doc__)
+        sys.stderr.write('ERROR: Must either run next to config.yaml or specify a config file.\n' + __doc__)
         sys.exit(2)
     with open(config_file) as fp:
         return load(fp)
@@ -117,6 +115,33 @@ def output_results(results, metric, options):
             sys.stdout.write(line)
 
 
+def value_pad_results(results, start_time, end_time, interval, value=0):
+    """
+    Pad CloudWatch results with a default value.
+
+    For a set of CloudWatch API results, check if there is a result at each timestamp results are expected;
+    where absent, set it to the 'value' parameter. Return the padded set of results. Start and end times
+    need to have the microseconds shaved to match what the CloudWatch API returns.
+    :param results: the result set returned by get_metric_statistics
+    :param start_time: as passed to get_metric_statistics
+    :param end_time: as passed to get_metric_statistics
+    :param interval: the interval *in minutes* at which results are expected
+    :param value: the value to put in the results
+    :return:
+    """
+    this_time = start_time - datetime.timedelta(microseconds=start_time.microsecond)
+    end_time = end_time - datetime.timedelta(microseconds=end_time.microsecond)
+    while this_time < end_time:
+        if not filter(lambda x: x['Timestamp'] == this_time, results):
+            results.append({
+                'Timestamp': this_time,
+                'Sum': value,
+                'Unit': 'Count',
+            })
+        this_time += datetime.timedelta(seconds=interval * 60)
+    return results
+
+
 def leadbutt(config_file, cli_options, verbose=False, **kwargs):
 
     # This function is defined in here so that the decorator can take CLI options, passed in from main()
@@ -153,9 +178,14 @@ def leadbutt(config_file, cli_options, verbose=False, **kwargs):
             config_options, metric.get('Options'), cli_options)
         period_local = options['Period'] * 60
         count_local = options['Count']
-        end_time = datetime.datetime.utcnow()
+        # if you have metrics that are available only every 5 minutes, be sure to request only stats
+        # that are likely/sure to be up to date, ie ones ending on the previous period increment.
+        end_time = datetime.datetime.utcnow() - datetime.timedelta(
+            seconds=int(time.time()) % period_local
+        )
         start_time = end_time - datetime.timedelta(
-            seconds=period_local * count_local)
+            seconds=period_local * count_local
+        )
         # if 'Unit 'is in the config, request only that; else get all units
         unit = metric.get('Unit')
         metric_names = metric['MetricName']
@@ -176,6 +206,15 @@ def leadbutt(config_file, cli_options, verbose=False, **kwargs):
                 dimensions=metric['Dimensions'],
                 unit=unit
             )
+
+            if 'NullIsZero' in options and metric_name in options['NullIsZero']:
+                results = value_pad_results(
+                    results,
+                    start_time,
+                    end_time,
+                    options['NullIsZero'][metric_name],
+                )
+
             output_results(results, this_metric, options)
             time.sleep(kwargs.get('interval', 0) / 1000.0)
 
