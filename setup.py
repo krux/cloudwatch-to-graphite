@@ -4,11 +4,11 @@ from setuptools import setup
 setup(
     name='cloudwatch-to-graphite',
     description='Helper for pushing AWS CloudWatch metrics to Graphite',
-    version='0.9.5b1',
+    version='0.9.5b2',
     author='Chris Chang',
     author_email='c@crccheck.com',
     url='https://github.com/crccheck/cloudwatch-to-graphite',
-    py_modules=['leadbutt', 'plumbum'],
+    py_modules=['leadbutt', 'plumbum', 'plumblead'],
     entry_points={
         'console_scripts': [
             'leadbutt = leadbutt:main',
