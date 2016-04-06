@@ -10,8 +10,6 @@ Options:
   -m MAX_INTERVAL             The maximum interval time to back off to, in ms [default: 4000]
   -p INT --period INT         Period length, in minutes [default: 1]
   -n INT                      Number of data points to try to get [default: 5]
-  -l BOOL                     Use of CloudWatch logs [default: false]
-  -g GROUP                    CloudWatch log group
   -v                          Verbose
   --version                   Show version.
 """
