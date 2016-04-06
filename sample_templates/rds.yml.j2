@@ -24,7 +24,8 @@
 
 Auth:
   region: "{{ region }}"
-
+EnhancedMetrics:
+  LogGroup: "RDSOSMetrics"
 Metrics:
 {%- for rds in resources %}
   {%- for metric in metrics %}

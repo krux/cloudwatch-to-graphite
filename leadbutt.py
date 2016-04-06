@@ -10,6 +10,8 @@ Options:
   -m MAX_INTERVAL             The maximum interval time to back off to, in ms [default: 4000]
   -p INT --period INT         Period length, in minutes [default: 1]
   -n INT                      Number of data points to try to get [default: 5]
+  -l BOOL                     Use of CloudWatch logs [default: false]
+  -g GROUP                    CloudWatch log group
   -v                          Verbose
   --version                   Show version.
 """
@@ -23,11 +25,13 @@ import time
 
 from docopt import docopt
 import boto.ec2.cloudwatch
+import boto.logs
 from retrying import retry
 import yaml
 
 
-# emulate six.text_type based on https://docs.python.org/3/howto/pyporting.html#str-unicode
+# emulate six.text_type based on
+# https://docs.python.org/3/howto/pyporting.html#str-unicode
 if sys.version_info[0] >= 3:
     text_type = str
 else:
@@ -59,7 +63,8 @@ def get_config(config_file):
     if config_file == '-':
         return load(sys.stdin)
     if not os.path.exists(config_file):
-        sys.stderr.write('ERROR: Must either run next to config.yaml or specify a config file.\n' + __doc__)
+        sys.stderr.write(
+            'ERROR: Must either run next to config.yaml or specify a config file.\n' + __doc__)
         sys.exit(2)
     with open(config_file) as fp:
         return load(fp)
@@ -83,6 +88,172 @@ def get_options(config_options, local_options, cli_options):
     if cli_options is not None:
         options.update(cli_options)
     return options
+
+
+def log_list_map(index, category, statistic_dict):
+    list_map = {
+        "network": "interface",
+        "diskIO": "device",
+        "fileSys": "name",
+        "processList": "name"
+    }
+    return list_map.get(statistic_dict[category], index)
+
+
+def unit_type_map(category, statistic):
+    unit_map = {
+        "cpuUtilization": {
+            "guest": "Percent",
+            "irq": "Percent",
+            "system": "Percent",
+            "wait": "Percent",
+            "idle": "Percent",
+            "user": "Percent",
+            "total": "Percent",
+            "steal": "Percent",
+            "nice": "Percent",
+        },
+        "loadAverageMinute": {
+            "fifteen": "Count",
+            "five": "Count",
+            "one": "Count",
+        },
+        "memory": {
+            "writeback": "Kilobytes",
+            "hugePagesFree": "Count",
+            "hugePagesRsvd": "Count",
+            "hugePagesSurp": "Count",
+            "hugePagesTotal": "Count",
+            "cached": "Kilobytes",
+            "hugePagesSize": "Kilobytes",
+            "pageTables": "Kilobytes",
+            "dirty": "Kilobytes",
+            "mapped": "Kilobytes",
+            "active": "Kilobytes",
+            "total": "Kilobytes",
+            "slab": "Kilobytes",
+            "buffers": "Kilobytes",
+        },
+        "tasks": {
+            "sleeping": "Count",
+            "zombie": "Count",
+            "running": "Count",
+            "stopped": "Count",
+            "total": "Count",
+            "blocked": "Count"
+        },
+        "swap": {
+            "cached": "Kilobytes",
+            "total": "Kilobytes",
+            "free": "Kilobytes"
+        },
+        "network":
+        {
+            "rx": "Bytes/Second",
+            "tx": "Bytes/Second"
+        },
+        "diskIO":
+        {
+            "writeKbPS": "Kilobytes/Second",
+            "readIOsPS": "IO/Second",
+            "await": "Milliseconds",
+            "readKbPS": "Kilobytes/Second",
+            "rrqmPS": "IO/Second",
+            "util": "Percent",
+            "avgQueueLen": "Milliseconds",
+            "tps": "Count",
+            "readKb": "Kilobytes",
+            "writeKb": "Kilobytes",
+            "avgReqSz": "Kilobytes",
+            "wrqmPS": "IO/Second",
+            "writeIOsPS": "IO/Second"
+        },
+        "fileSys":
+        {
+            "used": "Kilobytes",
+            "usedFiles": "Count",
+            "usedFilePercent": "Percent",
+            "maxFiles": "Count",
+            "total": "Kilobytes",
+            "usedPercent": "Percent"
+        },
+        "processList":
+        {
+            "vss": "Kilobytes",
+            "tgid": "Count",
+            "parentID": "Count",
+            "memoryUsedPc": "Percent",
+            "cpuUsedPc": "Percent",
+            "id": "Count",
+            "rss": "Kilobytes"
+        }
+    }
+    return unit_map[category].get(statistic, 'Count')
+
+
+def output_log_results(formatter, ingestion_time, context, value):
+    metric_name = (formatter % context).replace('/', '.').lower()
+    line = '{0} {1} {2}\n'.format(
+        metric_name,
+        value,
+        timegm(ingestion_time.timetuple()),
+    )
+    sys.stdout.write(line)
+
+
+def process_log_results(results, options):
+    """
+    Output CW enhanced Monitoring to stdout.
+
+    http://boto.cloudhackers.com/en/latest/ref/logs.html
+    """
+    # formatter is different if the category is a list vs dict
+    formatter = 'cloudwatch.%(Namespace)s.%(Dimension)s.EnhancedMonitoring.%(MetricName)s.%(Statistic)s.%(Unit)s'
+    list_formatter = 'cloudwatch.%(Namespace)s.%(Dimension)s.EnhancedMonitoring.%(MetricName)s.%(ListCategory)s.%(Statistic)s.%(Unit)s'
+    context = {}
+    # iterate over each result
+    for result in results:
+        # timestamp when metric arrived at queue
+        ingestion_time = result['ingestionTime']
+        message = ast.literal_eval(result['message'])
+        context['Dimension'] = result['instanceID']
+        # iterate over category keys example: ["cpuUtilization", "memory"]
+        for category in message.keys():
+            context['MetricName'] = category
+            statistics = message[category]
+            statistics_type = type(statistics)
+            # process logs if value is a dictionary
+            if statistics_type is dict:
+                for statistic in statistics.keys():
+                    context['Statistic'] = statistic
+                    value = statistics[statistic]
+                    if type(value) is int or type(value) is float:
+                        # determine unit type example (Bytes/Second, Percent,
+                        # Count)
+                        context['Unit'] = unit_type_map(
+                            category, statistic)
+                        # output log to stdout for netcat to pickup
+                        output_log_results(
+                            formatter, ingestion_time, context, value)
+            # process list values differently, because of sub types
+            elif statistics_type is list:
+                for index, statistic_dict in statistics
+                    statistic_list = statistic_dict.keys()
+                    # determine sub type using static map
+                    context['ListCategory'] = log_list_map(
+                        index, category, statistic_dict)
+                    for statistic in statistic_list:
+                        context['Statistic'] = statistic
+                        value = statistics[statistic]
+                        # make sure value is a integer
+                        if type(value) is int or type(value) is float:
+                            # determine unit type example (Bytes/Second,
+                            # Percent, Count)
+                            context['Unit'] = unit_type_map(
+                                category, statistic)
+                            # output log to stdout for netcat to pickup
+                            output_log_results(
+                                list_formatter, ingestion_time, context, value)
 
 
 def output_results(results, metric, options):
@@ -129,7 +300,8 @@ def value_pad_results(results, start_time, end_time, interval, value=0):
     :param value: the value to put in the results
     :return:
     """
-    this_time = start_time - datetime.timedelta(microseconds=start_time.microsecond)
+    this_time = start_time - \
+        datetime.timedelta(microseconds=start_time.microsecond)
     end_time = end_time - datetime.timedelta(microseconds=end_time.microsecond)
     while this_time < end_time:
         if not filter(lambda x: x['Timestamp'] == this_time, results):
@@ -145,10 +317,12 @@ def value_pad_results(results, start_time, end_time, interval, value=0):
 def leadbutt(config_file, cli_options, verbose=False, **kwargs):
 
     # This function is defined in here so that the decorator can take CLI options, passed in from main()
-    # we'll re-use the interval to sleep at the bottom of the loop that calls get_metric_statistics.
+    # we'll re-use the interval to sleep at the bottom of the loop that calls
+    # get_metric_statistics.
     @retry(wait_exponential_multiplier=kwargs.get('interval', None),
            wait_exponential_max=kwargs.get('max_interval', None),
-           # give up at the point the next cron of this script probably runs; Period is minutes; some_max_delay needs ms
+           # give up at the point the next cron of this script probably runs;
+           # Period is minutes; some_max_delay needs ms
            stop_max_delay=cli_options['Count'] * cli_options['Period'] * 60 * 1000)
     def get_metric_statistics(**kwargs):
         """
@@ -160,9 +334,20 @@ def leadbutt(config_file, cli_options, verbose=False, **kwargs):
         connection = kwargs.pop('connection')
         return connection.get_metric_statistics(**kwargs)
 
+    def get_logs_statistics(**kwargs):
+        """
+        A thin wrapper around boto.logs.get_log_events, for the
+        purpose of adding the @retry decorator
+        :param kwargs:
+        :return:
+        """
+        connection = kwargs.pop('connection')
+        return connection.get_log_events(**kwargs)
+
     config = get_config(config_file)
     config_options = config.get('Options')
     auth_options = config.get('Auth', {})
+    enhanced_monitoring = config.get('EnhancedMonitoring', false)
 
     region = auth_options.get('region', DEFAULT_REGION)
     connect_args = {
@@ -171,15 +356,47 @@ def leadbutt(config_file, cli_options, verbose=False, **kwargs):
     if 'aws_access_key_id' in auth_options:
         connect_args['aws_access_key_id'] = auth_options['aws_access_key_id']
     if 'aws_secret_access_key' in auth_options:
-        connect_args['aws_secret_access_key'] = auth_options['aws_secret_access_key']
+        connect_args['aws_secret_access_key'] = auth_options[
+            'aws_secret_access_key']
     conn = boto.ec2.cloudwatch.connect_to_region(region, **connect_args)
+    if enhanced_monitoring:
+        options = get_options(
+            config_options, metric.get('Options'), cli_options)
+        period_local = options['Period'] * 60
+        count_local = options['Count']
+        log_group = enhanced_metrics['LogGroup']
+        # if you have metrics that are available only every 5 minutes, be sure to request only stats
+        # that are likely/sure to be up to date, ie ones ending on the previous
+        # period increment.
+        end_time = datetime.datetime.utcnow() - datetime.timedelta(
+            seconds=int(time.time()) % period_local
+        )
+        start_time = end_time - datetime.timedelta(
+            seconds=period_local * count_local
+        )
+        conn = boto.logs.connect_to_region(region)
+        log_streams = conn.describe_log_streams(log_group_name=log_group)
+        streams = map(lambda x: x['logStreamName'], log_streams['logStreams'])
+        for stream in streams:
+            results = get_log_statistics(
+                connection=conn,
+                start_from_head=false,
+                limit=20,
+                start_time=start_time,
+                end_time=end_time,
+                log_stream_name=stream,
+                log_group_name=log_group
+            )
+            output_log_results(results, options)
+
     for metric in config['Metrics']:
         options = get_options(
             config_options, metric.get('Options'), cli_options)
         period_local = options['Period'] * 60
         count_local = options['Count']
         # if you have metrics that are available only every 5 minutes, be sure to request only stats
-        # that are likely/sure to be up to date, ie ones ending on the previous period increment.
+        # that are likely/sure to be up to date, ie ones ending on the previous
+        # period increment.
         end_time = datetime.datetime.utcnow() - datetime.timedelta(
             seconds=int(time.time()) % period_local
         )
@@ -221,11 +438,19 @@ def leadbutt(config_file, cli_options, verbose=False, **kwargs):
 
 def main(*args, **kwargs):
     options = docopt(__doc__, version=__version__)
-    # help: http://boto.readthedocs.org/en/latest/ref/cloudwatch.html#boto.ec2.cloudwatch.CloudWatchConnection.get_metric_statistics
+    # help:
+    # http://boto.readthedocs.org/en/latest/ref/cloudwatch.html#boto.ec2.cloudwatch.CloudWatchConnection.get_metric_statistics
     config_file = options.pop('--config-file')
     period = int(options.pop('--period'))
     count = int(options.pop('-n'))
     verbose = options.pop('-v')
+    cw_logs = options.pop('-l')
+
+    if cw_logs:
+        log_group = options.pop('-g')
+        return leadbutt_logs(log_group=log_group
+                             interval=float(options.pop('-i')),
+                             max_interval=float(options.pop('-m')))
     cli_options = {}
     if period is not None:
         cli_options['Period'] = period
