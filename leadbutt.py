@@ -20,6 +20,7 @@ import datetime
 import os.path
 import sys
 import time
+import ast
 
 from docopt import docopt
 import boto.ec2.cloudwatch
@@ -88,14 +89,15 @@ def get_options(config_options, local_options, cli_options):
     return options
 
 
-def log_list_map(index, category, statistic_dict):
+def log_list_map(category, statistic_dict):
     list_map = {
         "network": "interface",
         "diskIO": "device",
         "fileSys": "name",
         "processList": "name"
     }
-    return list_map.get(statistic_dict[category], index)
+    # return list_map.get(statistic_dict[category], index)
+    return statistic_dict[list_map.get(category)]
 
 
 def unit_type_map(category, statistic):
@@ -194,7 +196,7 @@ def output_log_results(formatter, ingestion_time, context, value):
     line = '{0} {1} {2}\n'.format(
         metric_name,
         value,
-        timegm(ingestion_time.timetuple()),
+        ingestion_time,
     )
     sys.stdout.write(line)
 
@@ -206,15 +208,16 @@ def process_log_results(results, options):
     http://boto.cloudhackers.com/en/latest/ref/logs.html
     """
     # formatter is different if the category is a list vs dict
-    formatter = 'cloudwatch.%(Namespace)s.%(Dimension)s.EnhancedMonitoring.%(MetricName)s.%(Statistic)s.%(Unit)s'
-    list_formatter = 'cloudwatch.%(Namespace)s.%(Dimension)s.EnhancedMonitoring.%(MetricName)s.%(ListCategory)s.%(Statistic)s.%(Unit)s'
+    formatter = 'cloudwatch.main.us-east-1.rds.%(Dimension)s.EnhancedMonitoring.%(MetricName)s.%(Statistic)s.%(Unit)s'
+    list_formatter = 'cloudwatch.main.us-east-1.rds.%(Dimension)s.EnhancedMonitoring.%(MetricName)s.%(ListCategory)s.%(Statistic)s.%(Unit)s'
     context = {}
     # iterate over each result
     for result in results:
         # timestamp when metric arrived at queue
-        ingestion_time = result['ingestionTime']
+        ingestion_time = result['ingestionTime'] / 1000
         message = ast.literal_eval(result['message'])
-        context['Dimension'] = result['instanceID']
+        context['Dimension'] = message['instanceID']
+        context['Namespace'] = 'AWS/RDS'
         # iterate over category keys example: ["cpuUtilization", "memory"]
         for category in message.keys():
             context['MetricName'] = category
@@ -235,14 +238,14 @@ def process_log_results(results, options):
                             formatter, ingestion_time, context, value)
             # process list values differently, because of sub types
             elif statistics_type is list:
-                for index, statistic_dict in statistics
+                for statistic_dict in statistics:
                     statistic_list = statistic_dict.keys()
                     # determine sub type using static map
                     context['ListCategory'] = log_list_map(
-                        index, category, statistic_dict)
+                        category, statistic_dict)
                     for statistic in statistic_list:
                         context['Statistic'] = statistic
-                        value = statistics[statistic]
+                        value = statistic_dict[statistic]
                         # make sure value is a integer
                         if type(value) is int or type(value) is float:
                             # determine unit type example (Bytes/Second,
@@ -345,7 +348,7 @@ def leadbutt(config_file, cli_options, verbose=False, **kwargs):
     config = get_config(config_file)
     config_options = config.get('Options')
     auth_options = config.get('Auth', {})
-    enhanced_monitoring = config.get('EnhancedMonitoring', false)
+    enhanced_monitoring = config.get('EnhancedMonitoring', False)
 
     region = auth_options.get('region', DEFAULT_REGION)
     connect_args = {
@@ -357,35 +360,6 @@ def leadbutt(config_file, cli_options, verbose=False, **kwargs):
         connect_args['aws_secret_access_key'] = auth_options[
             'aws_secret_access_key']
     conn = boto.ec2.cloudwatch.connect_to_region(region, **connect_args)
-    if enhanced_monitoring:
-        options = get_options(
-            config_options, metric.get('Options'), cli_options)
-        period_local = options['Period'] * 60
-        count_local = options['Count']
-        log_group = enhanced_metrics['LogGroup']
-        # if you have metrics that are available only every 5 minutes, be sure to request only stats
-        # that are likely/sure to be up to date, ie ones ending on the previous
-        # period increment.
-        end_time = datetime.datetime.utcnow() - datetime.timedelta(
-            seconds=int(time.time()) % period_local
-        )
-        start_time = end_time - datetime.timedelta(
-            seconds=period_local * count_local
-        )
-        conn = boto.logs.connect_to_region(region)
-        log_streams = conn.describe_log_streams(log_group_name=log_group)
-        streams = map(lambda x: x['logStreamName'], log_streams['logStreams'])
-        for stream in streams:
-            results = get_log_statistics(
-                connection=conn,
-                start_from_head=false,
-                limit=20,
-                start_time=start_time,
-                end_time=end_time,
-                log_stream_name=stream,
-                log_group_name=log_group
-            )
-            output_log_results(results, options)
 
     for metric in config['Metrics']:
         options = get_options(
@@ -401,6 +375,7 @@ def leadbutt(config_file, cli_options, verbose=False, **kwargs):
         start_time = end_time - datetime.timedelta(
             seconds=period_local * count_local
         )
+
         # if 'Unit 'is in the config, request only that; else get all units
         unit = metric.get('Unit')
         metric_names = metric['MetricName']
@@ -417,6 +392,7 @@ def leadbutt(config_file, cli_options, verbose=False, **kwargs):
                 end_time=end_time,
                 metric_name=metric_name,
                 namespace=metric['Namespace'],
+
                 statistics=metric['Statistics'],
                 dimensions=metric['Dimensions'],
                 unit=unit
@@ -433,6 +409,39 @@ def leadbutt(config_file, cli_options, verbose=False, **kwargs):
             output_results(results, this_metric, options)
             time.sleep(kwargs.get('interval', 0) / 1000.0)
 
+        # run enhanced monitoring after if it is enabled
+        if enhanced_monitoring:
+            options = get_options(
+                config_options, None, cli_options)
+            period_local = options['Period'] * 60
+            count_local = options['Count']
+            log_group = enhanced_monitoring['LogGroup']
+            # if you have metrics that are available only every 5 minutes, be sure to request only stats
+            # that are likely/sure to be up to date, ie ones ending on the previous
+            # period increment.
+            end_time = int((datetime.datetime.now() - datetime.timedelta(
+                seconds=int(time.time()) % period_local
+            )).strftime("%s")) * 1000
+            start_time = end_time - (period_local * count_local * 1000)
+
+            conn = boto.logs.connect_to_region(region)
+            log_streams = conn.describe_log_streams(log_group_name=log_group)
+            streams = map(lambda x: x['logStreamName'],
+                          log_streams['logStreams'])
+
+            for stream in streams:
+                results = get_logs_statistics(
+                    connection=conn,
+                    start_from_head=False,
+                    limit=50,
+                    start_time=start_time,
+                    end_time=end_time,
+                    log_stream_name=stream,
+                    log_group_name=log_group
+                )
+                process_log_results(results['events'], options)
+                time.sleep(0.5)  # rate limiting
+
 
 def main(*args, **kwargs):
     options = docopt(__doc__, version=__version__)
@@ -442,13 +451,7 @@ def main(*args, **kwargs):
     period = int(options.pop('--period'))
     count = int(options.pop('-n'))
     verbose = options.pop('-v')
-    cw_logs = options.pop('-l')
 
-    if cw_logs:
-        log_group = options.pop('-g')
-        return leadbutt_logs(log_group=log_group
-                             interval=float(options.pop('-i')),
-                             max_interval=float(options.pop('-m')))
     cli_options = {}
     if period is not None:
         cli_options['Period'] = period
