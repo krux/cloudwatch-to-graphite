@@ -416,15 +416,17 @@ def leadbutt(config_file, cli_options, verbose=False, **kwargs):
             end_time = int((datetime.datetime.now() - datetime.timedelta(seconds=int(time.time()) % period_local)).strftime("%s")) * 1000
             start_time = end_time - (period_local * count_local * 1000)
             # connect to endpoint
-            conn = boto.logs.connect_to_region(region)
+            logs_conn = boto.logs.connect_to_region(region)
             # get all streams in log group
-            log_streams = conn.describe_log_streams(log_group_name=log_group)
+            log_streams = logs_conn.describe_log_streams(log_group_name=log_group)
             # pluck only stream names out
             streams = map(lambda x: x['logStreamName'], log_streams['logStreams'])
             # retrieve logs for this time period from all streams
+            print'-----------------------------------'
+            print'-----------------------------------'
             for stream in streams:
                 results = get_logs_statistics(
-                    connection=conn,
+                    connection=logs_conn,
                     start_from_head=False,
                     limit=50,
                     start_time=start_time,
