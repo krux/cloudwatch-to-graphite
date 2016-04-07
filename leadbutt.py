@@ -29,8 +29,7 @@ from retrying import retry
 import yaml
 
 
-# emulate six.text_type based on
-# https://docs.python.org/3/howto/pyporting.html#str-unicode
+# emulate six.text_type based on https://docs.python.org/3/howto/pyporting.html#str-unicode
 if sys.version_info[0] >= 3:
     text_type = str
 else:
@@ -62,8 +61,7 @@ def get_config(config_file):
     if config_file == '-':
         return load(sys.stdin)
     if not os.path.exists(config_file):
-        sys.stderr.write(
-            'ERROR: Must either run next to config.yaml or specify a config file.\n' + __doc__)
+        sys.stderr.write('ERROR: Must either run next to config.yaml or specify a config file.\n' + __doc__)
         sys.exit(2)
     with open(config_file) as fp:
         return load(fp)
@@ -297,8 +295,7 @@ def value_pad_results(results, start_time, end_time, interval, value=0):
     :param value: the value to put in the results
     :return:
     """
-    this_time = start_time - \
-        datetime.timedelta(microseconds=start_time.microsecond)
+    this_time = start_time - datetime.timedelta(microseconds=start_time.microsecond)
     end_time = end_time - datetime.timedelta(microseconds=end_time.microsecond)
     while this_time < end_time:
         if not filter(lambda x: x['Timestamp'] == this_time, results):
@@ -314,8 +311,7 @@ def value_pad_results(results, start_time, end_time, interval, value=0):
 def leadbutt(config_file, cli_options, verbose=False, **kwargs):
 
     # This function is defined in here so that the decorator can take CLI options, passed in from main()
-    # we'll re-use the interval to sleep at the bottom of the loop that calls
-    # get_metric_statistics.
+    # we'll re-use the interval to sleep at the bottom of the loop that calls get_metric_statistics.
     @retry(wait_exponential_multiplier=kwargs.get('interval', None),
            wait_exponential_max=kwargs.get('max_interval', None),
            # give up at the point the next cron of this script probably runs;
@@ -347,15 +343,17 @@ def leadbutt(config_file, cli_options, verbose=False, **kwargs):
     enhanced_monitoring = config.get('EnhancedMonitoring', False)
 
     region = auth_options.get('region', DEFAULT_REGION)
-    connect_args = {'debug': 2 if verbose else 0, }
+    connect_args = {
+        'debug': 2 if verbose else 0,
+    }
     if 'aws_access_key_id' in auth_options:
         connect_args['aws_access_key_id'] = auth_options['aws_access_key_id']
     if 'aws_secret_access_key' in auth_options:
         connect_args['aws_secret_access_key'] = auth_options['aws_secret_access_key']
     conn = boto.ec2.cloudwatch.connect_to_region(region, **connect_args)
-
     for metric in config['Metrics']:
-        options = get_options(config_options, metric.get('Options'), cli_options)
+        options = get_options(
+            config_options, metric.get('Options'), cli_options)
         period_local = options['Period'] * 60
         count_local = options['Count']
         # if you have metrics that are available only every 5 minutes, be sure to request only stats
@@ -380,7 +378,6 @@ def leadbutt(config_file, cli_options, verbose=False, **kwargs):
                 end_time=end_time,
                 metric_name=metric_name,
                 namespace=metric['Namespace'],
-
                 statistics=metric['Statistics'],
                 dimensions=metric['Dimensions'],
                 unit=unit
@@ -441,8 +438,7 @@ def leadbutt(config_file, cli_options, verbose=False, **kwargs):
 
 def main(*args, **kwargs):
     options = docopt(__doc__, version=__version__)
-    # help:
-    # http://boto.readthedocs.org/en/latest/ref/cloudwatch.html#boto.ec2.cloudwatch.CloudWatchConnection.get_metric_statistics
+    # help: http://boto.readthedocs.org/en/latest/ref/cloudwatch.html#boto.ec2.cloudwatch.CloudWatchConnection.get_metric_statistics
     config_file = options.pop('--config-file')
     period = int(options.pop('--period'))
     count = int(options.pop('-n'))
@@ -453,7 +449,10 @@ def main(*args, **kwargs):
         cli_options['Period'] = period
     if count is not None:
         cli_options['Count'] = count
-    leadbutt(config_file, cli_options, verbose, interval=float(options.pop('-i')), max_interval=float(options.pop('-m')))
+    leadbutt(config_file, cli_options, verbose,
+             interval=float(options.pop('-i')),
+             max_interval=float(options.pop('-m'))
+             )
 
 
 if __name__ == '__main__':
