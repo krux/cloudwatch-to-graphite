@@ -207,9 +207,7 @@ def process_log_results(results, options):
 
     http://boto.cloudhackers.com/en/latest/ref/logs.html
     """
-    # formatter is different if the category is a list vs dict
-    formatter = 'cloudwatch.main.us-east-1.rds.%(Dimension)s.EnhancedMonitoring.%(MetricName)s.%(Statistic)s.%(Unit)s'
-    list_formatter = 'cloudwatch.main.us-east-1.rds.%(Dimension)s.EnhancedMonitoring.%(MetricName)s.%(ListCategory)s.%(Statistic)s.%(Unit)s'
+
     context = {}
     # iterate over each result
     for result in results:
@@ -234,8 +232,7 @@ def process_log_results(results, options):
                         context['Unit'] = unit_type_map(
                             category, statistic)
                         # output log to stdout for netcat to pickup
-                        output_log_results(
-                            formatter, ingestion_time, context, value)
+                        output_log_results(options['Formatter'], ingestion_time, context, value)
             # process list values differently, because of sub types
             elif statistics_type is list:
                 for statistic_dict in statistics:
@@ -253,8 +250,7 @@ def process_log_results(results, options):
                             context['Unit'] = unit_type_map(
                                 category, statistic)
                             # output log to stdout for netcat to pickup
-                            output_log_results(
-                                list_formatter, ingestion_time, context, value)
+                            output_log_results(options['ListFormatter'], ingestion_time, context, value)
 
 
 def output_results(results, metric, options):
@@ -351,30 +347,22 @@ def leadbutt(config_file, cli_options, verbose=False, **kwargs):
     enhanced_monitoring = config.get('EnhancedMonitoring', False)
 
     region = auth_options.get('region', DEFAULT_REGION)
-    connect_args = {
-        'debug': 2 if verbose else 0,
-    }
+    connect_args = {'debug': 2 if verbose else 0, }
     if 'aws_access_key_id' in auth_options:
         connect_args['aws_access_key_id'] = auth_options['aws_access_key_id']
     if 'aws_secret_access_key' in auth_options:
-        connect_args['aws_secret_access_key'] = auth_options[
-            'aws_secret_access_key']
+        connect_args['aws_secret_access_key'] = auth_options['aws_secret_access_key']
     conn = boto.ec2.cloudwatch.connect_to_region(region, **connect_args)
 
     for metric in config['Metrics']:
-        options = get_options(
-            config_options, metric.get('Options'), cli_options)
+        options = get_options(config_options, metric.get('Options'), cli_options)
         period_local = options['Period'] * 60
         count_local = options['Count']
         # if you have metrics that are available only every 5 minutes, be sure to request only stats
         # that are likely/sure to be up to date, ie ones ending on the previous
         # period increment.
-        end_time = datetime.datetime.utcnow() - datetime.timedelta(
-            seconds=int(time.time()) % period_local
-        )
-        start_time = end_time - datetime.timedelta(
-            seconds=period_local * count_local
-        )
+        end_time = datetime.datetime.utcnow() - datetime.timedelta(seconds=int(time.time()) % period_local)
+        start_time = end_time - datetime.timedelta(seconds=period_local * count_local)
 
         # if 'Unit 'is in the config, request only that; else get all units
         unit = metric.get('Unit')
@@ -409,26 +397,34 @@ def leadbutt(config_file, cli_options, verbose=False, **kwargs):
             output_results(results, this_metric, options)
             time.sleep(kwargs.get('interval', 0) / 1000.0)
 
-        # run enhanced monitoring after if it is enabled
+        # get enhanced monitoring if it is enabled
         if enhanced_monitoring:
-            options = get_options(
-                config_options, None, cli_options)
+            options = get_options(config_options, None, cli_options)
+            # convert minutes to seconds
             period_local = options['Period'] * 60
             count_local = options['Count']
             log_group = enhanced_monitoring['LogGroup']
+            # determine formatter
+            if 'Formatter' in enhanced_monitoring:
+                options['Formatter'] = enhanced_monitoring['Formatter']
+            # determine if there is a custom formatter for logs in list form
+            if 'ListFormatter' in enhanced_monitoring:
+                options['ListFormatter'] = enhanced_monitoring['ListFormatter']
+            else:
+                options['ListFormatter'] = options['Formatter']
             # if you have metrics that are available only every 5 minutes, be sure to request only stats
             # that are likely/sure to be up to date, ie ones ending on the previous
             # period increment.
-            end_time = int((datetime.datetime.now() - datetime.timedelta(
-                seconds=int(time.time()) % period_local
-            )).strftime("%s")) * 1000
+            # convert date to miliseconds
+            end_time = int((datetime.datetime.now() - datetime.timedelta(seconds=int(time.time()) % period_local)).strftime("%s")) * 1000
             start_time = end_time - (period_local * count_local * 1000)
-
+            # connect to endpoint
             conn = boto.logs.connect_to_region(region)
+            # get all streams in log group
             log_streams = conn.describe_log_streams(log_group_name=log_group)
-            streams = map(lambda x: x['logStreamName'],
-                          log_streams['logStreams'])
-
+            # pluck only stream names out
+            streams = map(lambda x: x['logStreamName'], log_streams['logStreams'])
+            # retrieve logs for this time period from all streams
             for stream in streams:
                 results = get_logs_statistics(
                     connection=conn,
@@ -457,10 +453,7 @@ def main(*args, **kwargs):
         cli_options['Period'] = period
     if count is not None:
         cli_options['Count'] = count
-    leadbutt(config_file, cli_options, verbose,
-             interval=float(options.pop('-i')),
-             max_interval=float(options.pop('-m'))
-             )
+    leadbutt(config_file, cli_options, verbose, interval=float(options.pop('-i')), max_interval=float(options.pop('-m')))
 
 
 if __name__ == '__main__':

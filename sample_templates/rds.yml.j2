@@ -24,8 +24,10 @@
 
 Auth:
   region: "{{ region }}"
-EnhancedMetrics:
+EnhancedMonitoring:
   LogGroup: "RDSOSMetrics"
+  Formatter: 'cloudwatch.%(Namespace)s.%(Dimension)s.EnhancedMonitoring.%(MetricName)s.%(Statistic)s.%(Unit)s'
+  ListFormatter: 'cloudwatch.%(Namespace)s.%(Dimension)s.EnhancedMonitoring.%(MetricName)s.%(ListCategory)s.%(Statistic)s.%(Unit)s'
 Metrics:
 {%- for rds in resources %}
   {%- for metric in metrics %}
