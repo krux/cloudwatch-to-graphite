@@ -209,8 +209,8 @@ def process_log_results(results, options):
     context = {}
     # iterate over each result
     for result in results:
-        # timestamp when metric arrived at queue
-        ingestion_time = result['ingestionTime'] / 1000
+        # timestamp
+        timestamp = result['timestamp'] / 1000
         message = ast.literal_eval(result['message'])
         context['Dimension'] = message['instanceID']
         context['Namespace'] = 'AWS/RDS'
@@ -230,7 +230,7 @@ def process_log_results(results, options):
                         context['Unit'] = unit_type_map(
                             category, statistic)
                         # output log to stdout for netcat to pickup
-                        output_log_results(options['Formatter'], ingestion_time, context, value)
+                        output_log_results(options['Formatter'], timestamp, context, value)
             # process list values differently, because of sub types
             elif statistics_type is list:
                 for statistic_dict in statistics:
@@ -248,7 +248,7 @@ def process_log_results(results, options):
                             context['Unit'] = unit_type_map(
                                 category, statistic)
                             # output log to stdout for netcat to pickup
-                            output_log_results(options['ListFormatter'], ingestion_time, context, value)
+                            output_log_results(options['ListFormatter'], timestamp, context, value)
 
 
 def output_results(results, metric, options):
@@ -405,11 +405,11 @@ def leadbutt(config_file, cli_options, verbose=False, **kwargs):
         # determine formatter
         if 'Formatter' in enhanced_monitoring:
             options['Formatter'] = enhanced_monitoring['Formatter']
+            options['ListFormatter'] = options['Formatter']
         # determine if there is a custom formatter for logs in list form
         if 'ListFormatter' in enhanced_monitoring:
             options['ListFormatter'] = enhanced_monitoring['ListFormatter']
-        else:
-            options['ListFormatter'] = options['Formatter']
+
         # if you have metrics that are available only every 5 minutes, be sure to request only stats
         # that are likely/sure to be up to date, ie ones ending on the previous
         # period increment.
