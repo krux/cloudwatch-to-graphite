@@ -351,91 +351,91 @@ def leadbutt(config_file, cli_options, verbose=False, **kwargs):
     if 'aws_secret_access_key' in auth_options:
         connect_args['aws_secret_access_key'] = auth_options['aws_secret_access_key']
     conn = boto.ec2.cloudwatch.connect_to_region(region, **connect_args)
-    for metric in config['Metrics']:
-        options = get_options(
-            config_options, metric.get('Options'), cli_options)
-        period_local = options['Period'] * 60
-        count_local = options['Count']
-        # if you have metrics that are available only every 5 minutes, be sure to request only stats
-        # that are likely/sure to be up to date, ie ones ending on the previous
-        # period increment.
-        end_time = datetime.datetime.utcnow() - datetime.timedelta(seconds=int(time.time()) % period_local)
-        start_time = end_time - datetime.timedelta(seconds=period_local * count_local)
-
-        # if 'Unit 'is in the config, request only that; else get all units
-        unit = metric.get('Unit')
-        metric_names = metric['MetricName']
-        if not isinstance(metric_names, list):
-            metric_names = [metric_names]
-        for metric_name in metric_names:
-            # we need a copy of the metric dict with the MetricName swapped out
-            this_metric = metric.copy()
-            this_metric['MetricName'] = metric_name
-            results = get_metric_statistics(
-                connection=conn,
-                period=period_local,
-                start_time=start_time,
-                end_time=end_time,
-                metric_name=metric_name,
-                namespace=metric['Namespace'],
-                statistics=metric['Statistics'],
-                dimensions=metric['Dimensions'],
-                unit=unit
-            )
-
-            if 'NullIsZero' in options and metric_name in options['NullIsZero']:
-                results = value_pad_results(
-                    results,
-                    start_time,
-                    end_time,
-                    options['NullIsZero'][metric_name],
-                )
-
-            output_results(results, this_metric, options)
-            time.sleep(kwargs.get('interval', 0) / 1000.0)
-
-        # get enhanced monitoring if it is enabled
-        if enhanced_monitoring:
-            options = get_options(config_options, None, cli_options)
-            # convert minutes to seconds
+    if 'Metrics' in config:
+        for metric in config['Metrics']:
+            options = get_options(
+                config_options, metric.get('Options'), cli_options)
             period_local = options['Period'] * 60
             count_local = options['Count']
-            log_group = enhanced_monitoring['LogGroup']
-            # determine formatter
-            if 'Formatter' in enhanced_monitoring:
-                options['Formatter'] = enhanced_monitoring['Formatter']
-            # determine if there is a custom formatter for logs in list form
-            if 'ListFormatter' in enhanced_monitoring:
-                options['ListFormatter'] = enhanced_monitoring['ListFormatter']
-            else:
-                options['ListFormatter'] = options['Formatter']
             # if you have metrics that are available only every 5 minutes, be sure to request only stats
             # that are likely/sure to be up to date, ie ones ending on the previous
             # period increment.
-            # convert date to miliseconds
-            end_time = int((datetime.datetime.now() - datetime.timedelta(seconds=int(time.time()) % period_local)).strftime("%s")) * 1000
-            start_time = end_time - (period_local * count_local * 1000)
-            # connect to endpoint
-            logs_conn = boto.logs.connect_to_region(region)
-            # get all streams in log group
-            log_streams = logs_conn.describe_log_streams(log_group_name=log_group)
-            # pluck only stream names out
-            streams = map(lambda x: x['logStreamName'], log_streams['logStreams'])
-            # retrieve logs for this time period from all streams
-            print'-----------------------------------'
-            print'-----------------------------------'
-            for stream in streams:
-                results = get_logs_statistics(
-                    connection=logs_conn,
-                    start_from_head=False,
-                    limit=50,
+            end_time = datetime.datetime.utcnow() - datetime.timedelta(seconds=int(time.time()) % period_local)
+            start_time = end_time - datetime.timedelta(seconds=period_local * count_local)
+
+            # if 'Unit 'is in the config, request only that; else get all units
+            unit = metric.get('Unit')
+            metric_names = metric['MetricName']
+            if not isinstance(metric_names, list):
+                metric_names = [metric_names]
+            for metric_name in metric_names:
+                # we need a copy of the metric dict with the MetricName swapped out
+                this_metric = metric.copy()
+                this_metric['MetricName'] = metric_name
+                results = get_metric_statistics(
+                    connection=conn,
+                    period=period_local,
                     start_time=start_time,
                     end_time=end_time,
-                    log_stream_name=stream,
-                    log_group_name=log_group
+                    metric_name=metric_name,
+                    namespace=metric['Namespace'],
+                    statistics=metric['Statistics'],
+                    dimensions=metric['Dimensions'],
+                    unit=unit
                 )
-                process_log_results(results['events'], options)
-                time.sleep(0.5)  # rate limiting
+
+                if 'NullIsZero' in options and metric_name in options['NullIsZero']:
+                    results = value_pad_results(
+                        results,
+                        start_time,
+                        end_time,
+                        options['NullIsZero'][metric_name],
+                    )
+
+                output_results(results, this_metric, options)
+                time.sleep(kwargs.get('interval', 0) / 1000.0)
+
+    # get enhanced monitoring if it is enabled
+    if enhanced_monitoring:
+        options = get_options(config_options, None, cli_options)
+        # convert minutes to seconds
+        period_local = options['Period'] * 60
+        count_local = options['Count']
+        log_group = enhanced_monitoring['LogGroup']
+        # determine formatter
+        if 'Formatter' in enhanced_monitoring:
+            options['Formatter'] = enhanced_monitoring['Formatter']
+        # determine if there is a custom formatter for logs in list form
+        if 'ListFormatter' in enhanced_monitoring:
+            options['ListFormatter'] = enhanced_monitoring['ListFormatter']
+        else:
+            options['ListFormatter'] = options['Formatter']
+        # if you have metrics that are available only every 5 minutes, be sure to request only stats
+        # that are likely/sure to be up to date, ie ones ending on the previous
+        # period increment.
+        # convert date to miliseconds
+        end_time = int((datetime.datetime.now() - datetime.timedelta(seconds=int(time.time()) % period_local)).strftime("%s")) * 1000
+        start_time = end_time - (period_local * count_local * 1000)
+        # connect to endpoint
+        logs_conn = boto.logs.connect_to_region(region)
+        # get all streams in log group
+        log_streams = logs_conn.describe_log_streams(log_group_name=log_group)
+        # pluck only stream names out
+        streams = map(lambda x: x['logStreamName'], log_streams['logStreams'])
+        # retrieve logs for this time period from all streams
+
+        for stream in streams:
+            results = get_logs_statistics(
+                connection=logs_conn,
+                start_from_head=False,
+                limit=50,
+                start_time=start_time,
+                end_time=end_time,
+                log_stream_name=stream,
+                log_group_name=log_group
+            )
+            process_log_results(results['events'], options)
+            time.sleep(0.5)  # rate limiting
 
 
 def main(*args, **kwargs):
