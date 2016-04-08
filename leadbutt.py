@@ -411,8 +411,7 @@ def leadbutt(config_file, cli_options, verbose=False, **kwargs):
             options['ListFormatter'] = enhanced_monitoring['ListFormatter']
 
         # if you have metrics that are available only every 5 minutes, be sure to request only stats
-        # that are likely/sure to be up to date, ie ones ending on the previous
-        # period increment.
+        # that are likely/sure to be up to date, ie ones ending on the previous period increment.
         # convert date to miliseconds
         end_time = int((datetime.datetime.now() - datetime.timedelta(seconds=int(time.time()) % period_local)).strftime("%s")) * 1000
         start_time = end_time - (period_local * count_local * 1000)

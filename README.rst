@@ -98,6 +98,24 @@ metric names. I wasn't sure what should be default, so I copied
 
     cloudwatch.%(Namespace)s.%(dimension)s.%(MetricName)s.%(statistic)s.%(Unit)s
 
+Enhanced Monitoring has two options for formatting, because some of the metrics
+contain a list of dictionaries. This is not required, but if your list contains
+more than one dictionary it will overwrite. In the example below ``eth0`` would
+be used as ``ListCategory`` in formatter.
+
+    ```json
+    "network":[
+       {
+          "interface":"eth0",
+          "rx":92.33,
+          "tx":1561.72
+       }
+    ]
+    ```
+
+    cloudwatch.%(Namespace)s.%(Dimension)s.EnhancedMonitoring.%(MetricName)s.%(Statistic)s.%(Unit)s
+    cloudwatch.%(Namespace)s.%(Dimension)s.EnhancedMonitoring.%(MetricName)s.%(ListCategory)s.%(Statistic)s.%(Unit)s
+
 TitleCased variables come directly from the YAML configuration, while lowercase
 variables are derived:
 
