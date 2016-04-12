@@ -47,6 +47,101 @@ DEFAULT_OPTIONS = {
     'Count': 5,  # 5 periods
     'Formatter': 'cloudwatch.%(Namespace)s.%(dimension)s.%(MetricName)s.%(statistic)s.%(Unit)s'
 }
+# catergory map to find what value describes the metrics
+LIST_CATEGORY_MAP = {
+    "network": "interface",
+    "diskIO": "device",
+    "fileSys": "name",
+    "processList": "name"
+}
+# graphite unit map for each value
+UNIT_MAP = {
+    "cpuUtilization": {
+        "guest": "Percent",
+        "irq": "Percent",
+        "system": "Percent",
+        "wait": "Percent",
+        "idle": "Percent",
+        "user": "Percent",
+        "total": "Percent",
+        "steal": "Percent",
+        "nice": "Percent",
+    },
+    "loadAverageMinute": {
+        "fifteen": "Count",
+        "five": "Count",
+        "one": "Count",
+    },
+    "memory": {
+        "writeback": "Kilobytes",
+        "hugePagesFree": "Count",
+        "hugePagesRsvd": "Count",
+        "hugePagesSurp": "Count",
+        "hugePagesTotal": "Count",
+        "cached": "Kilobytes",
+        "hugePagesSize": "Kilobytes",
+        "pageTables": "Kilobytes",
+        "dirty": "Kilobytes",
+        "mapped": "Kilobytes",
+        "active": "Kilobytes",
+        "total": "Kilobytes",
+        "slab": "Kilobytes",
+        "buffers": "Kilobytes",
+    },
+    "tasks": {
+        "sleeping": "Count",
+        "zombie": "Count",
+        "running": "Count",
+        "stopped": "Count",
+        "total": "Count",
+        "blocked": "Count"
+    },
+    "swap": {
+        "cached": "Kilobytes",
+        "total": "Kilobytes",
+        "free": "Kilobytes"
+    },
+    "network":
+    {
+        "rx": "Bytes/Second",
+        "tx": "Bytes/Second"
+    },
+    "diskIO":
+    {
+        "writeKbPS": "Kilobytes/Second",
+        "readIOsPS": "IO/Second",
+        "await": "Milliseconds",
+        "readKbPS": "Kilobytes/Second",
+        "rrqmPS": "IO/Second",
+        "util": "Percent",
+        "avgQueueLen": "Milliseconds",
+        "tps": "Count",
+        "readKb": "Kilobytes",
+        "writeKb": "Kilobytes",
+        "avgReqSz": "Kilobytes",
+        "wrqmPS": "IO/Second",
+        "writeIOsPS": "IO/Second"
+    },
+    "fileSys":
+    {
+        "used": "Kilobytes",
+        "usedFiles": "Count",
+        "usedFilePercent": "Percent",
+        "maxFiles": "Count",
+        "total": "Kilobytes",
+        "usedPercent": "Percent"
+    },
+    "processList":
+    {
+        "vss": "Kilobytes",
+        "tgid": "Count",
+        "parentID": "Count",
+        "memoryUsedPc": "Percent",
+        "cpuUsedPc": "Percent",
+        "id": "Count",
+        "rss": "Kilobytes"
+    }
+}
 
 
 def get_config(config_file):
@@ -88,113 +183,19 @@ def get_options(config_options, local_options, cli_options):
 
 
 def log_list_map(category, statistic_dict):
-    list_map = {
-        "network": "interface",
-        "diskIO": "device",
-        "fileSys": "name",
-        "processList": "name"
-    }
-    # return list_map.get(statistic_dict[category], index)
-    return statistic_dict[list_map.get(category)]
+    return statistic_dict[LIST_CATEGORY_MAP.get(category)]
 
 
 def unit_type_map(category, statistic):
-    unit_map = {
-        "cpuUtilization": {
-            "guest": "Percent",
-            "irq": "Percent",
-            "system": "Percent",
-            "wait": "Percent",
-            "idle": "Percent",
-            "user": "Percent",
-            "total": "Percent",
-            "steal": "Percent",
-            "nice": "Percent",
-        },
-        "loadAverageMinute": {
-            "fifteen": "Count",
-            "five": "Count",
-            "one": "Count",
-        },
-        "memory": {
-            "writeback": "Kilobytes",
-            "hugePagesFree": "Count",
-            "hugePagesRsvd": "Count",
-            "hugePagesSurp": "Count",
-            "hugePagesTotal": "Count",
-            "cached": "Kilobytes",
-            "hugePagesSize": "Kilobytes",
-            "pageTables": "Kilobytes",
-            "dirty": "Kilobytes",
-            "mapped": "Kilobytes",
-            "active": "Kilobytes",
-            "total": "Kilobytes",
-            "slab": "Kilobytes",
-            "buffers": "Kilobytes",
-        },
-        "tasks": {
-            "sleeping": "Count",
-            "zombie": "Count",
-            "running": "Count",
-            "stopped": "Count",
-            "total": "Count",
-            "blocked": "Count"
-        },
-        "swap": {
-            "cached": "Kilobytes",
-            "total": "Kilobytes",
-            "free": "Kilobytes"
-        },
-        "network":
-        {
-            "rx": "Bytes/Second",
-            "tx": "Bytes/Second"
-        },
-        "diskIO":
-        {
-            "writeKbPS": "Kilobytes/Second",
-            "readIOsPS": "IO/Second",
-            "await": "Milliseconds",
-            "readKbPS": "Kilobytes/Second",
-            "rrqmPS": "IO/Second",
-            "util": "Percent",
-            "avgQueueLen": "Milliseconds",
-            "tps": "Count",
-            "readKb": "Kilobytes",
-            "writeKb": "Kilobytes",
-            "avgReqSz": "Kilobytes",
-            "wrqmPS": "IO/Second",
-            "writeIOsPS": "IO/Second"
-        },
-        "fileSys":
-        {
-            "used": "Kilobytes",
-            "usedFiles": "Count",
-            "usedFilePercent": "Percent",
-            "maxFiles": "Count",
-            "total": "Kilobytes",
-            "usedPercent": "Percent"
-        },
-        "processList":
-        {
-            "vss": "Kilobytes",
-            "tgid": "Count",
-            "parentID": "Count",
-            "memoryUsedPc": "Percent",
-            "cpuUsedPc": "Percent",
-            "id": "Count",
-            "rss": "Kilobytes"
-        }
-    }
-    return unit_map[category].get(statistic, 'Count')
+    return UNIT_MAP[category].get(statistic, 'Count')
 
 
-def output_log_results(formatter, ingestion_time, context, value):
-    metric_name = (formatter % context).replace('/', '.').lower()
+def output_log_results(formatter, context, value):
+    metric_name = (formatter % context).replace('/', '.').replace(' ', '_').lower()
     line = '{0} {1} {2}\n'.format(
         metric_name,
         value,
-        ingestion_time,
+        context['timestamp'],
     )
     sys.stdout.write(line)
 
@@ -209,46 +210,38 @@ def process_log_results(results, options):
     context = {}
     # iterate over each result
     for result in results:
-        # timestamp
-        timestamp = result['timestamp'] / 1000
+
         message = ast.literal_eval(result['message'])
-        context['Dimension'] = message['instanceID']
+        # convert timestamp from eposh milliseconds to seconds
+        context['timestamp'] = result['timestamp'] / 1000
+        context['dimension'] = message['instanceID']
         context['Namespace'] = 'AWS/RDS'
         # iterate over category keys example: ["cpuUtilization", "memory"]
-        for category in message.keys():
+        for category, statistics in message.iteritems():
             context['MetricName'] = category
-            statistics = message[category]
             statistics_type = type(statistics)
-            # process logs if value is a dictionary
+
+            # process metrics in dictionary format
             if statistics_type is dict:
-                for statistic in statistics.keys():
-                    context['Statistic'] = statistic
-                    value = statistics[statistic]
-                    if type(value) is int or type(value) is float:
-                        # determine unit type example (Bytes/Second, Percent,
-                        # Count)
-                        context['Unit'] = unit_type_map(
-                            category, statistic)
-                        # output log to stdout for netcat to pickup
-                        output_log_results(options['Formatter'], timestamp, context, value)
+                _process_stat_dict(options['Formatter'], statistics, context, category)
+
             # process list values differently, because of sub types
             elif statistics_type is list:
                 for statistic_dict in statistics:
                     statistic_list = statistic_dict.keys()
                     # determine sub type using static map
-                    context['ListCategory'] = log_list_map(
-                        category, statistic_dict)
-                    for statistic in statistic_list:
-                        context['Statistic'] = statistic
-                        value = statistic_dict[statistic]
-                        # make sure value is a integer
-                        if type(value) is int or type(value) is float:
-                            # determine unit type example (Bytes/Second,
-                            # Percent, Count)
-                            context['Unit'] = unit_type_map(
-                                category, statistic)
-                            # output log to stdout for netcat to pickup
-                            output_log_results(options['ListFormatter'], timestamp, context, value)
+                    context['ListCategory'] = statistic_dict[LIST_CATEGORY_MAP.get(category)]
+                    _process_stat_dict(options['ListFormatter'], statistic_dict, context, category)
+
+
+def _process_stat_dict(formatter, statistic_dict, context, category):
+    for statistic, value in statistic_dict.iteritems():
+        context['statistic'] = statistic
+        # Let's not calculate same thing twice
+        value_type = type(value)
+        if value_type is int or value_type is float:
+            context['Unit'] = UNIT_MAP[category].get(statistic, 'Count')
+            output_log_results(formatter, context, value)
 
 
 def output_results(results, metric, options):
@@ -314,8 +307,7 @@ def leadbutt(config_file, cli_options, verbose=False, **kwargs):
     # we'll re-use the interval to sleep at the bottom of the loop that calls get_metric_statistics.
     @retry(wait_exponential_multiplier=kwargs.get('interval', None),
            wait_exponential_max=kwargs.get('max_interval', None),
-           # give up at the point the next cron of this script probably runs;
-           # Period is minutes; some_max_delay needs ms
+           # give up at the point the next cron of this script probably runs; Period is minutes; some_max_delay needs ms
            stop_max_delay=cli_options['Count'] * cli_options['Period'] * 60 * 1000)
     def get_metric_statistics(**kwargs):
         """
@@ -341,6 +333,7 @@ def leadbutt(config_file, cli_options, verbose=False, **kwargs):
     config_options = config.get('Options')
     auth_options = config.get('Auth', {})
     enhanced_monitoring = config.get('EnhancedMonitoring', False)
+    metrics = config.get('Metrics', False)
 
     region = auth_options.get('region', DEFAULT_REGION)
     connect_args = {
@@ -351,8 +344,8 @@ def leadbutt(config_file, cli_options, verbose=False, **kwargs):
     if 'aws_secret_access_key' in auth_options:
         connect_args['aws_secret_access_key'] = auth_options['aws_secret_access_key']
     conn = boto.ec2.cloudwatch.connect_to_region(region, **connect_args)
-    if 'Metrics' in config:
-        for metric in config['Metrics']:
+    if metrics:
+        for metric in metrics:
             options = get_options(
                 config_options, metric.get('Options'), cli_options)
             period_local = options['Period'] * 60
@@ -405,7 +398,7 @@ def leadbutt(config_file, cli_options, verbose=False, **kwargs):
         # determine formatter
         if 'Formatter' in enhanced_monitoring:
             options['Formatter'] = enhanced_monitoring['Formatter']
-            options['ListFormatter'] = options['Formatter']
+            options['ListFormatter'] = enhanced_monitoring['Formatter']
         # determine if there is a custom formatter for logs in list form
         if 'ListFormatter' in enhanced_monitoring:
             options['ListFormatter'] = enhanced_monitoring['ListFormatter']
