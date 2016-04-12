@@ -182,14 +182,6 @@ def get_options(config_options, local_options, cli_options):
     return options
 
 
-def log_list_map(category, statistic_dict):
-    return statistic_dict[LIST_CATEGORY_MAP.get(category)]
-
-
-def unit_type_map(category, statistic):
-    return UNIT_MAP[category].get(statistic, 'Count')
-
-
 def output_log_results(formatter, context, value):
     metric_name = (formatter % context).replace('/', '.').replace(' ', '_').lower()
     line = '{0} {1} {2}\n'.format(
