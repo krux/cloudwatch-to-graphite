@@ -405,7 +405,7 @@ def leadbutt(config_file, cli_options, verbose=False, **kwargs):
         # get all streams in log group
         log_streams = logs_conn.describe_log_streams(log_group_name=log_group)
         # pluck only stream names out
-        streams = map(lambda x: x['logStreamName'], log_streams['logStreams'])
+        streams = [log['logStreamName'] for log in log_streams['logStreams']]
         # retrieve logs for this time period from all streams
 
         for stream in streams:
