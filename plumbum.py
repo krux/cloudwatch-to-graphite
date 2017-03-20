@@ -238,7 +238,7 @@ list_resources = {
     'kinesisapp': list_kinesis_applications,
     'dynamodb': list_dynamodb,
     'billing': list_billing,
-    'redshift': list_redshift
+    'redshift': list_redshift,
 }
 
 
