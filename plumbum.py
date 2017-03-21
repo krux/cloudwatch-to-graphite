@@ -43,6 +43,7 @@ import boto.elasticache
 import boto.ec2.autoscale
 import boto.kinesis
 import boto.sqs
+import boto.redshift
 import jinja2
 
 from leadbutt import __version__
@@ -218,6 +219,15 @@ def list_dynamodb(region, filter_by_kwargs):
     return lookup(tables, filter_by=filter_by_kwargs)
 
 
+def list_redshift(region, filter_by_kwargs):
+    """ list all redshift clusters."""
+    conn = boto.redshift.connect_to_region(region)
+    response = conn.describe_clusters()['DescribeClustersResponse']
+    result = response['DescribeClustersResult']
+    clusters = result['Clusters']
+    return lookup(clusters, filter_by=filter_by_kwargs)
+
+
 list_resources = {
     'ec2': list_ec2,
     'elb': list_elb,
@@ -227,7 +237,8 @@ list_resources = {
     'sqs': list_sqs,
     'kinesisapp': list_kinesis_applications,
     'dynamodb': list_dynamodb,
-    'billing': list_billing
+    'billing': list_billing,
+    'redshift': list_redshift,
 }
 
 

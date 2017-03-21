@@ -246,6 +246,9 @@ def output_results(results, metric, options):
     context = metric.copy()  # XXX might need to sanitize this
     try:
         context['dimension'] = list(metric['Dimensions'].values())[0]
+        # Dimensions is a dict and multiple can be sent for each query.
+        # Added specifically for redshift NodeID and ClusterIdentifier
+        context.update(metric['Dimensions'])
     except AttributeError:
         context['dimension'] = ''
     for result in results:

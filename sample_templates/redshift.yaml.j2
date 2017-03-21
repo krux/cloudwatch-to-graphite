@@ -1,0 +1,34 @@
+# Redshift metrics configuration
+Auth:
+  region: {{ region }}
+Options:
+  Formatter: 'cloudwatch.{{ account_alias }}.{{ region }}.redshift.%(dimension)s.%(NodeID)s.%(MetricName)s.%(statistic)s.%(Unit)s'
+Metrics:
+
+{% for redshift in resources %}
+
+    {% for node in redshift.ClusterNodes %}
+- Namespace: "AWS/Redshift"
+  Dimensions:
+    ClusterIdentifier: {{ redshift.ClusterIdentifier }}
+    # When returned from the api all characters are capital.
+    # To query we need them with only the first character capital.
+    NodeID: {{ node.NodeRole.lower().title() }}
+  MetricName:
+    - CPUUtilization
+    - ReadThroughput
+    - NetworkReceiveThroughput
+    - DatabaseConnections
+    - HealthStatus
+    - WriteThroughput
+    - ReadIOPS
+    - WriteLatency
+    - NetworkTransmitThroughput
+    - MaintenanceMode
+    - ReadLatency
+    - WriteIOPS
+    - PercentageDiskSpaceUsed
+  Statistics:
+    - Average
+    {% endfor %}
+{% endfor %}
